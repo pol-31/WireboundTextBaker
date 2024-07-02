@@ -16,12 +16,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_subdirectory(external EXCLUDE_FROM_ALL)
 
 add_executable(WireboundTextBaker
-        main.cpp
-        Parsing.cpp
-        Renderer.cpp
-        Serializing.cpp
-        Shader.cpp
-        Texture.cpp
+        src/main.cpp
+        src/Parsing.cpp
+        src/Renderer.cpp
+        src/Serializing.cpp
+        src/Shader.cpp
+        src/Texture.cpp
 )
 
 set(EXTERNAL_DIR ${CMAKE_SOURCE_DIR}/external)

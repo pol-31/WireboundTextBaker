@@ -1,7 +1,7 @@
 # WireboundTextBaker
 *Supplement for the main project [Wirebound](https://github.com/pol-31/Wirebound)*
 
-<img src="static/logo.svg" alt="Logo Wirebound" width="15%" align="right" />
+<img src="static/logo.svg" alt="Logo Wirebound" width="20%" align="right" />
 
 **WireboundTextBaker** is used for two purposes:
 - Generate bitmaps from `.ttf` files with configurable options such as font size and symbol selection. It also allows you to provide a text localization file to scan for more frequent characters, which will be added to the bitmaps.
