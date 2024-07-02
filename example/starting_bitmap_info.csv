@@ -1,0 +1,21 @@
+--- --- --- METADATA (first 20 rows will be skipped) --- --- ---
+8 columns, 12 rows, 96 chars max; name and font_path are necessary.
+name = no extension, no parent path; filename = name + extension;
+path = filename + parent path.
+If no resolution provided (or it's invalid) - used default value 512.
+___ Symbols to generate may be wrapped in "" and can contain indents;
+should be represented in hex format with 6 symbols (e.g. 0xFFFF) and
+separated by comma ','.
+Symbols ranges described with '-' (inclusive), e.g. 0x0020-0x007E.
+___ autogen('y') or glyph mapping data:
+- use 'y' to autogen symbols (everything else considered as "no");
+- if file is already generated, glyph mapping data store here.
+autogen symbols don't contain ASCII symbols (they always
+should be stored in separate bitmap). Width data represented as:
+float factor (uint32), int width min (uint32), int height (uint32),
+int full height (uint32) - including between-line space and
+std::vector<uint8_t> widths (uint8).
+___ localization path is optimal and used for symbols autogen
+  (it would be scanned for more frequent chars).
+name; font path (.ttf); resolution; symbols to generate; autogen('y') or glyph mapping data; localization path;
+bmp_ascii_header;/home/pavlo/Desktop/Wirebound_header.ttf;1024;"0x0020-0x007E";n;;

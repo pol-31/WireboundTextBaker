@@ -1,0 +1,111 @@
+METADATA
+7;60;
+--- --- --- --- --- --- --- --- --- --- --- ---
+COLUMNS FOR PRERENDER: (mandatory: filename, ascii bitmap)
+name; ascii bitmap name; ascii mask bitmap name; localization bmp name; localization mask bmp name; localization font path (.ttf); text size;
+--- --- --- --- --- --- --- --- --- --- --- ---
+en_prerendered_header;bmp_ascii_header;;;;;140;
+aqwertyuiopasdfghjklzxcvbnm
+QWERTYUIOPASDFGHJKLZXCVBNM
+important phrases for prerendering here
+Wirebound
+New game
+Load game
+Continue
+Archive
+Options
+Credits
+Quit
+Loading
+Copyright
+https
+github
+com
+Superman
+Lanb of God
+Pantera
+Hatebreed
+Machine Head
+Decapitated
+Godsmack
+Messhugah
+Belakor
+Dawn
+Monuments
+Testament
+Hew Collosal Hate
+London is the capital of Great Britain
+Re spect walk are you talking to me
+no way punk
+You take it as a weakness
+contract to die
+I am not going to tell you what happend
+You might guess why am I do this
+Navigate
+Next
+Prev
+Accept
+Quick
+General
+Interface
+Controls
+Audio
+Video
+Game
+Start
+Back
+Class
+Type
+Description
+(main text - all data including csv-like subdata, in no en.txt numbers are skipped)
+1. London is the capital of Great Britain and Nothern Island.
+2. Some components shold be invalidated.
+3. Hello, World!
+4. I don't quite approve of that.
+5. What's up, man, how is it going?
+6. Falltown,18,2000,3,5,"small quiet city with dense population and etc and etc"
+7. Calltown,31,4000,1,4,"small quiet city with dense population and etc and etc"
+8. Talltown,19,6000,8,9,"small quiet city with dense population and etc and etc"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

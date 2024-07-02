@@ -1,0 +1,302 @@
+#include "Serializing.h"
+
+#include <iomanip>
+#include <iostream>
+#include <filesystem>
+#include <format>
+#include <fstream>
+#include <sstream>
+
+#include <cstdlib> // for gperf sys-call
+
+#include <stb_image_write.h>
+
+#include "Details.h"
+
+void WriteBitmapsInfo(std::string_view path,
+                      const std::vector<BitmapInfo>& bmps_info,
+                      std::string_view old_entries) {
+  std::ofstream out_file(path.data());
+  if (!out_file) {
+    throw std::runtime_error("Failed to generate bitmaps info file");
+  }
+  out_file.write(details::kBmpsInfoMetadata.data(),
+                 details::kBmpsInfoMetadata.size());
+  for (const auto& bmp_info : bmps_info) {
+    std::string buffer;
+    buffer.reserve(1024);
+    std::stringstream oss_text(std::move(buffer));
+    oss_text
+        << '\n' << bmp_info.name << ';'
+        << bmp_info.font_path << ';'
+        << bmp_info.size << ";"
+        << "\"\n";
+    int chars_added = -1;
+    for (auto code : bmp_info.chars) {
+      if (++chars_added == details::kBitmapColumnNum) {
+        oss_text << '\n';
+        chars_added = 0;
+      }
+      oss_text << std::format("0x{:04X},", code);
+    }
+    oss_text << "\n\";";
+
+    /// .glyph_mapping and .autogen_symbols stored in the same field;
+    /// after generation we write .glyph_mapping
+    oss_text
+        << bmp_info.glyph_mapping.factor << ','
+        << bmp_info.glyph_mapping.min << ','
+        << bmp_info.glyph_mapping.height << ","
+        << bmp_info.glyph_mapping.full_height << ","
+        << "\"\n";
+    int widths_added = -1;
+    for (auto width : bmp_info.glyph_mapping.widths) {
+      if (++widths_added == details::kBitmapColumnNum) {
+        oss_text << '\n';
+        widths_added = 0;
+      }
+      oss_text << static_cast<int>(width) << ',';
+    }
+    oss_text << "\n\";" << bmp_info.loc_path << ';';
+    out_file << oss_text.str();
+  }
+  if (!old_entries.empty()) {
+    out_file.write("\n", 1);
+    out_file.write(
+        old_entries.data(), static_cast<std::streamsize>(old_entries.size()));
+  }
+}
+
+void WriteBitmapsInfo(std::string_view path,
+                      const std::vector<BitmapInfo>& bmps_info) {
+  return WriteBitmapsInfo(path, bmps_info, {});
+}
+
+void GenBmtInfoHeader(const std::vector<BitmapInfo>& bmp_info,
+                      std::string_view out_path) {
+  std::string buffer;
+  buffer.reserve(1024);
+  std::stringstream oss_text(std::move(buffer));
+
+  std::string header_guard;
+  header_guard.reserve(details::kBmpInfoHeaderGuard.size() + 3);
+  header_guard += details::kBmpInfoHeaderGuard;
+  header_guard += "_H_";
+  oss_text
+      << "#ifdef " << header_guard
+      <<  "\n#define " << header_guard
+      << "\n\n#include <array>"
+      << "\n\n#include <string_view>"
+      <<  "\n\nnamespace " <<  details::kBmpInfoNamespace << " {"
+      << "\n\ninline constexpr int kBitmapTotalChar = " <<
+      details::kBitmapTotalChar << ";"
+      <<  "\ninline constexpr int kBitmapRowNum = " <<
+      details::kBitmapRowNum << ";"
+      << "\ninline constexpr int kBitmapColumnNum = " <<
+      details::kBitmapColumnNum <<  ";";
+
+  oss_text <<
+      "\n\n/// widths packed by 4 bits; how to convert:"
+      "\n/// float comp_width;"
+      "\n/// if (char_idx & 1) {"
+      "\n/// \tcomp_width = static_cast<float>((widths[idx >> 1]) >> 4);"
+      "\n/// } else {"
+      "\n/// \tcomp_width = static_cast<float>((widths[idx >> 1]) & 0x0F);"
+      "\n/// }"
+      "\n/// return static_cast<int>(comp_width * factor) + min;";
+
+  for (const auto& bmp : bmp_info) {
+    oss_text
+        << "\n\ninline constexpr std::string_view k" <<
+        bmp.name
+             << "Name = \"" << bmp.name << "\";" <<
+        "\ninline constexpr std::string_view k" << bmp.name
+             <<
+        "FontPath = \"" << bmp.font_path << "\";"
+        << "\ninline constexpr int k" << bmp.name << "Size = " <<
+        bmp.size << ";";
+
+    /// skip useless for rendering .autogen_symbols and .loc_path
+    oss_text
+        << "\ninline constexpr std::array<int, " <<
+        bmp.chars.size() << "> k" << bmp.name <<
+        "Symbols = {\n\t";
+    int chars_added = -1;
+    for (auto code : bmp.chars) {
+      if (++chars_added == details::kBitmapColumnNum) {
+        oss_text << "\n\t";
+        chars_added = 0;
+      }
+      oss_text << code << ", ";
+    }
+    oss_text << "\n};";
+
+    /// widths / height
+    oss_text
+        << "\ninline constexpr int k" << bmp.name
+             <<
+        "WidthMin = " << bmp.glyph_mapping.min << ";"
+        << "\ninline constexpr int k" << bmp.name
+             <<
+        "Height = " << bmp.glyph_mapping.height << ";"
+        << "\ninline constexpr int k" << bmp.name
+             <<
+        "FullHeight = " << bmp.glyph_mapping.full_height << ";"
+        << "\ninline constexpr float k" << bmp.name
+             <<
+        "WidthFactor = " << bmp.glyph_mapping.factor << ";";
+
+    oss_text
+        << "\ninline constexpr std::array<std::uint8_t, " <<
+        bmp.glyph_mapping.widths.size() << "> k" <<
+        bmp.name
+             << "Widths = {\n\t";
+    int widths_added = -1;
+    for (auto width : bmp.glyph_mapping.widths) {
+      if (++widths_added == details::kBitmapColumnNum) {
+        oss_text << "\n\t";
+        widths_added = 0;
+      }
+      oss_text << static_cast<int>(width) << ", ";
+    }
+    oss_text << "\n};";
+  }
+  oss_text
+      << "\n\n} // namespace " <<  details::kBmpInfoNamespace
+      <<  "\n\n#endif  // " <<  header_guard <<  "\n";
+  std::ofstream out_file(out_path.data());
+  out_file << oss_text.str();
+}
+
+void GenTextCoordsHeader(const std::vector<Rectangle>& tex_coords,
+                         std::string_view namespace_name,
+                         std::string_view out_path,
+                         int idx) {
+  std::string buffer;
+  buffer.reserve(1024);
+  std::stringstream oss_text(std::move(buffer));
+
+  std::string header_guard;
+  header_guard.reserve(details::kTexCoordsHeaderGuard.size() + 8);
+  header_guard += details::kTexCoordsHeaderGuard;
+  header_guard += std::to_string(idx);
+  header_guard += "_H_";
+  oss_text
+      << "#ifdef " << header_guard
+      << "\n#define " << header_guard
+      << "\n\n#include <array>"
+      << "\n\nnamespace " << namespace_name << " {"
+      << "\n\n/// left, top, right, bottom\n";
+  for (std::size_t i = 0; i < tex_coords.size(); ++i) {
+    oss_text
+        << "\ninline constexpr std::array<float, 4> kTexCoords" << i << " = {"
+        << "\n\t" << tex_coords[i].left << ", " << tex_coords[i].top <<
+        ", " << tex_coords[i].right << ", " << tex_coords[i].bottom
+        << "\n};";
+  }
+  oss_text
+      << "\n\n} // namespace " << namespace_name
+      << "\n\n#endif  // " << header_guard << "\n";
+  std::ofstream out_file(out_path.data());
+  out_file << oss_text.str();
+}
+
+void StoreBitmapTexture(std::string_view bmps_dir,
+                        const BitmapInfo& bmp_info,
+                        unsigned char data[]) {
+  /// we've already resolved "already exists" conflicts at ParseBmpsData()
+  stbi_write_png(
+      std::format("{}/{}.png", bmps_dir, bmp_info.name).c_str(),
+      bmp_info.size, bmp_info.size, 1, data, 0);
+}
+
+void StorePhrasesTexCoords(const std::vector<Rectangle>& tex_coords,
+                           std::string_view name,
+                           std::string_view phrases_out_dir,
+                           int tex_coords_id) {
+  auto out_path = std::format(
+      "{}/tex_coords_{}.h", phrases_out_dir, name);
+  GenTextCoordsHeader(tex_coords, name,
+                      out_path, tex_coords_id);
+}
+
+void StorePhrasesTex(Renderer::TextureData& texture_data,
+                     std::string_view name,
+                     std::string_view phrases_out_dir) {
+  stbi_flip_vertically_on_write(true);
+  auto out_path = std::format(
+      "{}/tex_{}.png", phrases_out_dir, name);
+  stbi_write_png(out_path.data(), texture_data.width,
+                 texture_data.height, 1, texture_data.data.data(), 0);
+  stbi_flip_vertically_on_write(false);
+}
+
+void StorePhrasesTexMask(Renderer::TextureData& texture_data,
+                         std::string_view name,
+                         std::string_view phrases_out_dir) {
+  stbi_flip_vertically_on_write(true);
+  auto out_path = std::format(
+      "{}/tex_mask_{}.png", phrases_out_dir, name);
+  stbi_write_png(out_path.c_str(), texture_data.width,
+                 texture_data.height, 1, texture_data.data.data(), 0);
+  stbi_flip_vertically_on_write(false);
+}
+
+std::vector<std::string> CompressUtf8ToAsciiString(
+    const PhrasesType& utf8_phrases) {
+  std::vector<std::string> ascii_phrases;
+  std::string buffer;
+  buffer.reserve(128);
+  for (const auto& phrase : utf8_phrases) {
+    buffer.clear();
+    for (auto ch : phrase) {
+      int code = static_cast<int>(ch);
+      if (code < 128) {
+        buffer.push_back(static_cast<char>(code));
+      } else {
+        throw std::runtime_error(
+            std::format("char with code {} doesn't belong "
+                        "to ASCII symbols", code));
+      }
+    }
+    ascii_phrases.push_back(buffer);
+  }
+  return ascii_phrases;
+}
+
+void GenHash(const PhrasesType& utf8_phrases,
+             std::string_view out_path) {
+  std::vector<std::string> ascii_phrases;
+  try {
+    ascii_phrases= CompressUtf8ToAsciiString(utf8_phrases);
+  } catch (const std::exception& e) {
+    std::cerr << e.what() << std::endl;
+    return;
+  }
+  std::size_t total_length = 0;
+  for (const auto& phrase : ascii_phrases) {
+    total_length += phrase.size();
+  }
+  total_length += ascii_phrases.size(); // for '/n'
+  std::string all_text;
+  all_text.reserve(total_length);
+  for (const auto& phrase : ascii_phrases) {
+    all_text += phrase;
+    all_text += '\n';
+  }
+
+  auto temp_path = std::format(
+      "{}_temp.cpp", out_path);
+  std::ofstream temp_file(temp_path);
+  temp_file.write(
+      all_text.data(), static_cast<std::streamsize>(all_text.size()));
+  temp_file.close();
+
+  auto command = std::format(
+      "gperf {} > {}.cpp", temp_path, out_path);
+  int err_code = system(command.c_str());
+  if (err_code != 0) {
+    std::cerr << "gperf command failed with code: " << err_code << std::endl;
+  }
+  std::filesystem::remove(temp_path);
+}
