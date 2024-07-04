@@ -192,10 +192,13 @@ std::string SerializePhrasesTexCoords(
   oss_text << "\ninline constexpr std::array<Rectangle, " << tex_coords.size()
            << "> kTexCoords_" << name << " = {" << std::setprecision(4);
   for (const auto& coords : tex_coords) {
+    auto norm_coords = coords.PosToTexCoords();
     oss_text
-        << "\n\tRectangle{" << FormatFloat(coords.left)
-        << ',' << FormatFloat(coords.right) << ',' << FormatFloat(coords.top)
-        << ',' << FormatFloat(coords.bottom) << "},";
+        << "\n\tRectangle{" << FormatFloat(norm_coords.left)
+        << ',' << FormatFloat(norm_coords.right)
+        << ',' << FormatFloat(norm_coords.top)
+        << ',' << FormatFloat(norm_coords.bottom)
+        << "},";
   }
   oss_text << "\n};";
   return oss_text.str();

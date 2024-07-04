@@ -93,12 +93,14 @@ In Wirebound, we need a hash only for the English localization because we search
 ## Text Rendering Pipeline in Wirebound
 1. We get the string `";_;"`
 
-2.1) If the string content is known - at `constexpr` we check if it was prerendered:
+2) If the string content is known - at `constexpr` we check if it was prerendered:
    - If yes - we can directly ask for texture coordinates (happy end).
    - If no - continue.
 
-2.2) If the string content is unknown - continue.
+   If the string content is unknown - continue.
+
 3) Check if it was prerendered at runtime (in runtime we keep a caching texture with all last rendered text). If yes - ask for texture coordinates (happy end).
+
 4) Iterate through the string character by character and try to render it:
    - If the character is in the font bitmaps - ask for its coordinates.
    - If there's no bitmap with the needed character - open the `.ttf` file and render it (or throw an exception) and continue for all characters.
