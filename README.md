@@ -3,7 +3,7 @@
 
 
 <a href="https://github.com/pol-31/Wirebound">
-    <img src="static/logo.svg" alt="Logo Wirebound" width="25%" align="right" style="padding-left: 20px; padding-right: 20px;" />
+    <img src="static/logo.svg" alt="Logo Wirebound" width="20%" align="right" style="padding-left: 30px; padding-right: 30px;" />
 </a>
 
 **WireboundTextBaker** is used for two purposes:
