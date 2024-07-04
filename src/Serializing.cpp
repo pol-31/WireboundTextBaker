@@ -25,7 +25,7 @@ void WriteBitmapsInfo(std::string_view path,
   for (const auto& bmp_info : bmps_info) {
     std::string buffer;
     buffer.reserve(1024);
-    std::stringstream oss_text(std::move(buffer));
+    std::ostringstream oss_text(std::move(buffer));
     oss_text
         << '\n' << bmp_info.name << ';'
         << bmp_info.font_path << ';'
@@ -76,7 +76,7 @@ void GenBmtInfoHeader(const std::vector<BitmapInfo>& bmp_info,
                       std::string_view out_path) {
   std::string buffer;
   buffer.reserve(1024);
-  std::stringstream oss_text(std::move(buffer));
+  std::ostringstream oss_text(std::move(buffer));
 
   std::string header_guard;
   header_guard.reserve(details::kBmpInfoHeaderGuard.size() + 3);
@@ -168,18 +168,34 @@ void GenBmtInfoHeader(const std::vector<BitmapInfo>& bmp_info,
   out_file << oss_text.str();
 }
 
+inline void PrintFloat(std::ostringstream& ss, float value) {
+  ss << value;
+  if (static_cast<float>(static_cast<int>(value)) == value) {
+    ss << ".0";
+  }
+  ss << 'f';
+}
+
+std::string FormatFloat(float value) {
+  if (static_cast<float>(static_cast<int>(value)) == value) {
+    return std::format("{:.1f}f", value);
+  } else {
+    return std::format("{:.4f}f", value);
+  }
+}
+
 std::string SerializePhrasesTexCoords(
     const std::vector<Rectangle>& tex_coords, std::string_view name) {
   std::string buffer;
   buffer.reserve(1024);
-  std::stringstream oss_text(std::move(buffer));
-  oss_text << "\ninline constexpr std::array<float, " << tex_coords.size()
-           << "> kTexCoords_" << name << " = {";
+  std::ostringstream oss_text(std::move(buffer));
+  oss_text << "\ninline constexpr std::array<Rectangle, " << tex_coords.size()
+           << "> kTexCoords_" << name << " = {" << std::setprecision(4);
   for (const auto& coords : tex_coords) {
     oss_text
-        << "\n\t{" << coords.left << ", " << coords.right <<
-        ", " << coords.top << ", " << coords.bottom
-        << "},";
+        << "\n\tRectangle{" << FormatFloat(coords.left)
+        << ',' << FormatFloat(coords.right) << ',' << FormatFloat(coords.top)
+        << ',' << FormatFloat(coords.bottom) << "},";
   }
   oss_text << "\n};";
   return oss_text.str();

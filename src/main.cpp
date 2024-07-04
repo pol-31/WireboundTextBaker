@@ -99,7 +99,7 @@ int main(int argc, char* argv[]) {
   stbi_set_flip_vertically_on_load(true);
   switch (argc) {
     case 2:
-      if (std::string{argv[0]} == "-h") {
+      if (std::string{argv[1]} == "-h") {
         PrintHelp();
       } else {
         PrintFailure();
@@ -278,7 +278,7 @@ std::string GenerateBitmaps(std::string_view bmp_info_path,
       merge_files = true;
     } else if (respond != 'r') {
       std::cout << "Skip bitmap generation for " << bmp_info_out << std::endl;
-      return {};
+      return bmp_info_out.string();
     }
   }
 
@@ -430,7 +430,7 @@ void PrintFailure() {
 
 void PrintHelp() {
   std::cout
-      << "\n--- --- --- ---"
+      << "--- --- --- ---\n"
          "1) generate only bitmaps (2 args):\n"
          "  - bitmap_info.csv (should exist)\n"
          "  - dir for generated output\n"
