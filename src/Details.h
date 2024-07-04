@@ -70,8 +70,15 @@ inline constexpr int kShaderErrorBufferSize = 1024;
 inline constexpr int kAsciiFirstChar = 0x0020; // ' '
 inline constexpr int kAsciiLastChar = 0x007E; // '~'
 
+inline constexpr int kMaxPhrasesAllowed = 999;
+
+inline constexpr std::string_view kGpeftHashDeclaration =
+    "struct Phrase { char *name; int line; };\n%%\n";
+inline constexpr std::string_view  kGperfFlags =
+    "-e$ -t -LC++ -H Hash -N GetPhraseLine -Z PhrasesHash -CEIG -W kWordlist";
+
 inline constexpr std::string_view kTexCoordsHeaderGuard =
-    "WIREBOUND__ASSETS_TEXT_TEXTURE_DATA_";
+    "WIREBOUND__ASSETS_TEXT_TEXTURE_DATA_H_";
 
 inline constexpr std::string_view kBmpInfoHeaderFilename = "BitmapsInfo.h";
 inline constexpr std::string_view kBmpInfoNamespace = "bitmaps";

@@ -83,7 +83,7 @@ void GenBmtInfoHeader(const std::vector<BitmapInfo>& bmp_info,
   header_guard += details::kBmpInfoHeaderGuard;
   header_guard += "_H_";
   oss_text
-      << "#ifdef " << header_guard
+      << "#ifndef " << header_guard
       <<  "\n#define " << header_guard
       << "\n\n#include <array>"
       << "\n\n#include <string_view>"
@@ -107,19 +107,19 @@ void GenBmtInfoHeader(const std::vector<BitmapInfo>& bmp_info,
 
   for (const auto& bmp : bmp_info) {
     oss_text
-        << "\n\ninline constexpr std::string_view k" <<
+        << "\n\ninline constexpr std::string_view k_" <<
         bmp.name
              << "Name = \"" << bmp.name << "\";" <<
-        "\ninline constexpr std::string_view k" << bmp.name
+        "\ninline constexpr std::string_view k_" << bmp.name
              <<
         "FontPath = \"" << bmp.font_path << "\";"
-        << "\ninline constexpr int k" << bmp.name << "Size = " <<
+        << "\ninline constexpr int k_" << bmp.name << "Size = " <<
         bmp.size << ";";
 
     /// skip useless for rendering .autogen_symbols and .loc_path
     oss_text
         << "\ninline constexpr std::array<int, " <<
-        bmp.chars.size() << "> k" << bmp.name <<
+        bmp.chars.size() << "> k_" << bmp.name <<
         "Symbols = {\n\t";
     int chars_added = -1;
     for (auto code : bmp.chars) {
@@ -133,22 +133,22 @@ void GenBmtInfoHeader(const std::vector<BitmapInfo>& bmp_info,
 
     /// widths / height
     oss_text
-        << "\ninline constexpr int k" << bmp.name
+        << "\ninline constexpr int k_" << bmp.name
              <<
         "WidthMin = " << bmp.glyph_mapping.min << ";"
-        << "\ninline constexpr int k" << bmp.name
+        << "\ninline constexpr int k_" << bmp.name
              <<
         "Height = " << bmp.glyph_mapping.height << ";"
-        << "\ninline constexpr int k" << bmp.name
+        << "\ninline constexpr int k_" << bmp.name
              <<
         "FullHeight = " << bmp.glyph_mapping.full_height << ";"
-        << "\ninline constexpr float k" << bmp.name
+        << "\ninline constexpr float k_" << bmp.name
              <<
         "WidthFactor = " << bmp.glyph_mapping.factor << ";";
 
     oss_text
         << "\ninline constexpr std::array<std::uint8_t, " <<
-        bmp.glyph_mapping.widths.size() << "> k" <<
+        bmp.glyph_mapping.widths.size() << "> k_" <<
         bmp.name
              << "Widths = {\n\t";
     int widths_added = -1;
@@ -168,37 +168,21 @@ void GenBmtInfoHeader(const std::vector<BitmapInfo>& bmp_info,
   out_file << oss_text.str();
 }
 
-void GenTextCoordsHeader(const std::vector<Rectangle>& tex_coords,
-                         std::string_view namespace_name,
-                         std::string_view out_path,
-                         int idx) {
+std::string SerializePhrasesTexCoords(
+    const std::vector<Rectangle>& tex_coords, std::string_view name) {
   std::string buffer;
   buffer.reserve(1024);
   std::stringstream oss_text(std::move(buffer));
-
-  std::string header_guard;
-  header_guard.reserve(details::kTexCoordsHeaderGuard.size() + 8);
-  header_guard += details::kTexCoordsHeaderGuard;
-  header_guard += std::to_string(idx);
-  header_guard += "_H_";
-  oss_text
-      << "#ifdef " << header_guard
-      << "\n#define " << header_guard
-      << "\n\n#include <array>"
-      << "\n\nnamespace " << namespace_name << " {"
-      << "\n\n/// left, top, right, bottom\n";
-  for (std::size_t i = 0; i < tex_coords.size(); ++i) {
+  oss_text << "\ninline constexpr std::array<float, " << tex_coords.size()
+           << "> kTexCoords_" << name << " = {";
+  for (const auto& coords : tex_coords) {
     oss_text
-        << "\ninline constexpr std::array<float, 4> kTexCoords" << i << " = {"
-        << "\n\t" << tex_coords[i].left << ", " << tex_coords[i].top <<
-        ", " << tex_coords[i].right << ", " << tex_coords[i].bottom
-        << "\n};";
+        << "\n\t{" << coords.left << ", " << coords.right <<
+        ", " << coords.top << ", " << coords.bottom
+        << "},";
   }
-  oss_text
-      << "\n\n} // namespace " << namespace_name
-      << "\n\n#endif  // " << header_guard << "\n";
-  std::ofstream out_file(out_path.data());
-  out_file << oss_text.str();
+  oss_text << "\n};";
+  return oss_text.str();
 }
 
 void StoreBitmapTexture(std::string_view bmps_dir,
@@ -208,16 +192,6 @@ void StoreBitmapTexture(std::string_view bmps_dir,
   stbi_write_png(
       std::format("{}/{}.png", bmps_dir, bmp_info.name).c_str(),
       bmp_info.size, bmp_info.size, 1, data, 0);
-}
-
-void StorePhrasesTexCoords(const std::vector<Rectangle>& tex_coords,
-                           std::string_view name,
-                           std::string_view phrases_out_dir,
-                           int tex_coords_id) {
-  auto out_path = std::format(
-      "{}/tex_coords_{}.h", phrases_out_dir, name);
-  GenTextCoordsHeader(tex_coords, name,
-                      out_path, tex_coords_id);
 }
 
 void StorePhrasesTex(Renderer::TextureData& texture_data,
@@ -277,12 +251,23 @@ void GenHash(const PhrasesType& utf8_phrases,
   for (const auto& phrase : ascii_phrases) {
     total_length += phrase.size();
   }
-  total_length += ascii_phrases.size(); // for '/n'
+
+  /// $ used as a delimiter, so to allow user to provide ','/'.'
+  auto total_phrases =  ascii_phrases.size();
+  if (total_phrases > details::kMaxPhrasesAllowed) {
+    throw std::runtime_error(
+        std::format("too much phrases({}). Only {} is allowed",
+        total_phrases, details::kMaxPhrasesAllowed));
+  }
+  total_length += 3 * ascii_phrases.size(); // for '$','/n' and line_num (<999)
   std::string all_text;
-  all_text.reserve(total_length);
-  for (const auto& phrase : ascii_phrases) {
-    all_text += phrase;
-    all_text += '\n';
+  all_text.reserve(total_length + details::kGpeftHashDeclaration.size());
+
+  /// struct declaration
+  all_text += details::kGpeftHashDeclaration;
+
+  for (int i = 0; i < ascii_phrases.size(); ++i) {
+    all_text += std::format("{}${}\n", ascii_phrases[i], i);
   }
 
   auto temp_path = std::format(
@@ -293,10 +278,48 @@ void GenHash(const PhrasesType& utf8_phrases,
   temp_file.close();
 
   auto command = std::format(
-      "gperf {} > {}.cpp", temp_path, out_path);
+      "gperf {} {} > {}.h", details::kGperfFlags, temp_path, out_path);
   int err_code = system(command.c_str());
   if (err_code != 0) {
     std::cerr << "gperf command failed with code: " << err_code << std::endl;
   }
   std::filesystem::remove(temp_path);
 }
+
+void StoreTexCoords(std::string_view phrases_out_dir,
+                    const std::vector<std::string>& tex_coords_string) {
+  auto out_path = std::format("{}/PhrasesTexCoords.h", phrases_out_dir);
+  std::ofstream out_file(out_path.data());
+  if (!out_file) {
+    throw std::runtime_error("Failed to generate file with texture coords");
+  }
+  std::string buffer;
+  buffer.reserve(1024);
+  std::stringstream oss_text(std::move(buffer));
+
+  std::string header_guard;
+  header_guard.reserve(details::kTexCoordsHeaderGuard.size() + 8);
+  header_guard += details::kTexCoordsHeaderGuard;
+  oss_text
+      << "#ifndef " << header_guard
+      << "\n#define " << header_guard
+      << "\n\n#include <array>"
+      << "\n\nnamespace " << details::kBmpInfoNamespace << " {"
+      << "\n\nstruct Rectangle {"
+         "\n\tfloat left{0.0f};"
+         "\n\tfloat right{0.0f};"
+         "\n\tfloat top{0.0f};"
+         "\n\tfloat bottom{0.0f};"
+         "\n};\n";
+
+  for (const auto& entry : tex_coords_string) {
+    oss_text << entry << '\n';
+  }
+
+  oss_text
+      << "\n} // namespace " << details::kBmpInfoNamespace
+      << "\n\n#endif  // " << header_guard << "\n";
+
+  out_file << oss_text.str();
+}
+

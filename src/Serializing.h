@@ -18,19 +18,12 @@ void WriteBitmapsInfo(std::string_view path,
 void GenBmtInfoHeader(const std::vector<BitmapInfo>& bmp_info,
                       std::string_view out_path);
 
-void GenTextCoordsHeader(const std::vector<Rectangle>& tex_coords,
-                         std::string_view namespace_name,
-                         std::string_view out_path,
-                         int idx);
+std::string SerializePhrasesTexCoords(
+    const std::vector<Rectangle>& tex_coords, std::string_view name);
 
 void StoreBitmapTexture(std::string_view bmps_dir,
                         const BitmapInfo& bmp_info,
                         unsigned char data[]);
-
-void StorePhrasesTexCoords(const std::vector<Rectangle>& tex_coords,
-                           std::string_view name,
-                           std::string_view phrases_out_dir,
-                           int tex_coords_id);
 
 void StorePhrasesTex(Renderer::TextureData& texture_data,
                      std::string_view name,
@@ -46,5 +39,8 @@ std::vector<std::string> CompressUtf8ToAsciiString(
 /// there should be English localization, so only ASCII symbols
 void GenHash(const PhrasesType& utf8_phrases,
              std::string_view out_path);
+
+void StoreTexCoords(std::string_view phrases_out_dir,
+                    const std::vector<std::string>& tex_coords_string);
 
 #endif  // WIREBOUNDTEXTBAKER__SERIALIZING_H_

@@ -362,8 +362,8 @@ void PrerenderPhrases(std::string_view bmps_info_path,
   auto bmps_info = ParseBmpsData(bmps_dir, bmps_info_path, false);
 
   Renderer renderer;
+  std::vector<std::string> tex_coords_strings;
 
-  int counter_done = 0;
   for(const auto& entry
        : std::filesystem::directory_iterator(localizations_dir)) {
     if (!entry.is_regular_file()) {
@@ -391,7 +391,7 @@ void PrerenderPhrases(std::string_view bmps_info_path,
         auto out_path = std::format(
             "{}/{}", phrases_out_dir, phrases_info.name);
         GenHash(phrases_info.phrases, out_path);
-        std::cout << "->Hash generated" << std::endl;
+        std::cout << "->Hash generating is completed" << std::endl;
       }
 
       std::cout << "Phrases prerendering..." << std::endl;
@@ -401,12 +401,12 @@ void PrerenderPhrases(std::string_view bmps_info_path,
         std::cout << "->Phrases prerendering skipped" << std::endl;
         continue;
       }
-      std::cout << "->Phrases prerendered" << std::endl;
+      tex_coords_strings.push_back(SerializePhrasesTexCoords(
+          tex_coords, phrases_info.name));
+      std::cout << "->Phrases prerendering is completed" << std::endl;
 
       std::cout << "Storing data to files..." << std::endl;
       auto texture_data = renderer.GetTextureData();
-      StorePhrasesTexCoords(tex_coords, phrases_info.name,
-                            phrases_out_dir, ++counter_done);
       StorePhrasesTex(texture_data, phrases_info.name, phrases_out_dir);
 
       bool has_mask = !phrases_info.name_bmp_ascii_mask.empty();
@@ -419,6 +419,9 @@ void PrerenderPhrases(std::string_view bmps_info_path,
                 << " is completed" << std::endl;
     }
   }
+  std::cout << "Storing texture coords to files..." << std::endl;
+  StoreTexCoords(phrases_out_dir, tex_coords_strings);
+  std::cout << "->Storing texture coords is completed" << std::endl;
 }
 
 void PrintFailure() {
