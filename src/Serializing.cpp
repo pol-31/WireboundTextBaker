@@ -86,7 +86,8 @@ void GenBmtInfoHeader(const std::vector<BitmapInfo>& bmp_info,
       << "#ifndef " << header_guard
       <<  "\n#define " << header_guard
       << "\n\n#include <array>"
-      << "\n\n#include <string_view>"
+      << "\n#include <cinttypes>"
+      << "\n#include <string_view>"
       <<  "\n\nnamespace " <<  details::kBmpInfoNamespace << " {"
       << "\n\ninline constexpr int kBitmapTotalChar = " <<
       details::kBitmapTotalChar << ";"
@@ -96,70 +97,57 @@ void GenBmtInfoHeader(const std::vector<BitmapInfo>& bmp_info,
       details::kBitmapColumnNum <<  ";";
 
   oss_text <<
-      "\n\n/// widths packed by 4 bits; how to convert:"
-      "\n/// float comp_width;"
-      "\n/// if (char_idx & 1) {"
-      "\n/// \tcomp_width = static_cast<float>((widths[idx >> 1]) >> 4);"
-      "\n/// } else {"
-      "\n/// \tcomp_width = static_cast<float>((widths[idx >> 1]) & 0x0F);"
-      "\n/// }"
-      "\n/// return static_cast<int>(comp_width * factor) + min;";
+      "\n\n/// widths packed by 4 bits; how to convert:\n"
+      "/// float comp_width;\n"
+      "/// if (char_idx & 1) {\n"
+      "///   comp_width = static_cast<float>((widths[idx >> 1]) >> 4);\n"
+      "/// } else {\n"
+      "///   comp_width = static_cast<float>((widths[idx >> 1]) & 0x0F);\n"
+      "/// }\n"
+      "/// return static_cast<int>(comp_width * factor) + min;";
+
+  oss_text <<
+      "\n\nstruct BitmapInfo {\n"
+      "  std::string_view name;\n"
+      "  std::string_view ttf_path;\n"
+      "  std::array<int, 96> chars;\n"
+      "  int width_min;\n"
+      "  int height;\n"
+      "  int full_height;\n"
+      "  float width_factor;\n"
+      "  std::array<std::uint8_t, 48> widths;\n"
+      "};";
 
   for (const auto& bmp : bmp_info) {
     oss_text
-        << "\n\ninline constexpr std::string_view k_" <<
-        bmp.name
-             << "Name = \"" << bmp.name << "\";" <<
-        "\ninline constexpr std::string_view k_" << bmp.name
-             <<
-        "FontPath = \"" << bmp.font_path << "\";"
-        << "\ninline constexpr int k_" << bmp.name << "Size = " <<
-        bmp.size << ";";
+        << "\n\ninline constexpr BitmapInfo k_" << bmp.name << " = {\n"
+        << "  \"" << bmp.name << "\",\n"
+        << "  \"" << bmp.font_path << "\",\n"
+        << "  {\n    ";
 
-    /// skip useless for rendering .autogen_symbols and .loc_path
-    oss_text
-        << "\ninline constexpr std::array<int, " <<
-        bmp.chars.size() << "> k_" << bmp.name <<
-        "Symbols = {\n\t";
     int chars_added = -1;
     for (auto code : bmp.chars) {
       if (++chars_added == details::kBitmapColumnNum) {
-        oss_text << "\n\t";
+        oss_text << "\n    ";
         chars_added = 0;
       }
       oss_text << code << ", ";
     }
-    oss_text << "\n};";
-
-    /// widths / height
     oss_text
-        << "\ninline constexpr int k_" << bmp.name
-             <<
-        "WidthMin = " << bmp.glyph_mapping.min << ";"
-        << "\ninline constexpr int k_" << bmp.name
-             <<
-        "Height = " << bmp.glyph_mapping.height << ";"
-        << "\ninline constexpr int k_" << bmp.name
-             <<
-        "FullHeight = " << bmp.glyph_mapping.full_height << ";"
-        << "\ninline constexpr float k_" << bmp.name
-             <<
-        "WidthFactor = " << bmp.glyph_mapping.factor << ";";
+        << "\n  },\n  " << bmp.glyph_mapping.min
+        << ", " << bmp.glyph_mapping.height
+        << ", "  << bmp.glyph_mapping.full_height
+        << ", " << bmp.glyph_mapping.factor << ",\n  {\n    ";
 
-    oss_text
-        << "\ninline constexpr std::array<std::uint8_t, " <<
-        bmp.glyph_mapping.widths.size() << "> k_" <<
-        bmp.name
-             << "Widths = {\n\t";
     int widths_added = -1;
     for (auto width : bmp.glyph_mapping.widths) {
       if (++widths_added == details::kBitmapColumnNum) {
-        oss_text << "\n\t";
+        oss_text << "\n    ";
         widths_added = 0;
       }
       oss_text << static_cast<int>(width) << ", ";
     }
-    oss_text << "\n};";
+    oss_text << "\n  }\n};";
   }
   oss_text
       << "\n\n} // namespace " <<  details::kBmpInfoNamespace
@@ -189,16 +177,21 @@ std::string SerializePhrasesTexCoords(
   std::string buffer;
   buffer.reserve(1024);
   std::ostringstream oss_text(std::move(buffer));
-  oss_text << "\ninline constexpr std::array<Rectangle, " << tex_coords.size()
-           << "> kTexCoords_" << name << " = {" << std::setprecision(4);
+  /// order according to GL_TRIANGLE_STRIP (4 points in 2d -> 8 floats)
+  oss_text << "\ninline constexpr std::array<float, " << tex_coords.size() * 8
+           << "> kTexCoordsVbo_" << name << " = {" << std::setprecision(4);
   for (const auto& coords : tex_coords) {
     auto norm_coords = coords.PosToTexCoords();
     oss_text
-        << "\n\tRectangle{" << FormatFloat(norm_coords.left)
-        << ',' << FormatFloat(norm_coords.right)
-        << ',' << FormatFloat(norm_coords.top)
-        << ',' << FormatFloat(norm_coords.bottom)
-        << "},";
+        << "\n  "
+        << FormatFloat(norm_coords.right) << ','
+        << FormatFloat(norm_coords.bottom) << ','
+        << FormatFloat(norm_coords.right) << ','
+        << FormatFloat(norm_coords.top) << ','
+        << FormatFloat(norm_coords.left) << ','
+        << FormatFloat(norm_coords.bottom) << ','
+        << FormatFloat(norm_coords.left) << ','
+        << FormatFloat(norm_coords.top) << ',';
   }
   oss_text << "\n};";
   return oss_text.str();
@@ -323,13 +316,7 @@ void StoreTexCoords(std::string_view phrases_out_dir,
       << "#ifndef " << header_guard
       << "\n#define " << header_guard
       << "\n\n#include <array>"
-      << "\n\nnamespace " << details::kBmpInfoNamespace << " {"
-      << "\n\nstruct Rectangle {"
-         "\n\tfloat left{0.0f};"
-         "\n\tfloat right{0.0f};"
-         "\n\tfloat top{0.0f};"
-         "\n\tfloat bottom{0.0f};"
-         "\n};\n";
+      << "\n\nnamespace " << details::kBmpInfoNamespace << " {\n";
 
   for (const auto& entry : tex_coords_string) {
     oss_text << entry << '\n';
